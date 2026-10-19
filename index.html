@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquiFit & Rider Sync</title>
+    <style>
+        :root {
+            --primary: #2c5282;
+            --primary-light: #ebf8ff;
+            --accent: #2b6cb0;
+            --success: #2f855a;
+            --success-light: #f0fff4;
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-light: #718096;
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 24px; }
+        header h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 4px; }
+        header p { color: var(--text-light); font-size: 0.95rem; }
+        
+        .nav-tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { background: var(--card-bg); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--text-light); transition: all 0.2s; }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .card h2 { font-size: 1.25rem; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        
+        .sync-banner { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 16px; font-size: 0.9rem; }
+        
+        .date-picker-bar { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; font-size: 0.9rem; }
+        .date-picker-bar input { width: auto; }
+
+        /* Workout Checklist Styles */
+        .workout-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .workout-item:last-child { border-bottom: none; }
+        .workout-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .workout-details { flex: 1; }
+        .workout-details strong { display: block; font-size: 0.95rem; }
+        .workout-details span { font-size: 0.85rem; color: var(--text-light); }
+        
+        .swap-btn { background: #edf2f7; color: var(--text); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
+        .swap-btn:hover { background: #e2e8f0; }
+
+        /* Weight Tracking Styles */
+        .tracker-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+        input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; width: 100%; }
+        button { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: var(--text-light); }
+
+        /* Timer Styles */
+        .timer-display { font-size: 2.5rem; font-weight: bold; text-align: center; color: var(--primary); margin: 10px 0; }
+        .timer-controls { display: flex; justify-content: center; gap: 10px; }
+
+        /* History Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-light); font-weight: 600; }
+
+        .badge { background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>EquiFit & Rider Sync</h1>
+        <p>Unified conditioning for you and Remi — Peak season ready</p>
+    </header>
+
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">Today's Sync</button>
+        <button class="tab-btn" onclick="switchTab('rider-plan')">Rider's Plan</button>
+        <button class="tab-btn" onclick="switchTab('strength')">Strength & Lifts</button>
+        <button class="tab-btn" onclick="switchTab('remi')">Remi's Plan</button>
+        <button class="tab-btn" onclick="switchTab('timers')">Timers</button>
+    </div>
+
+    <!-- DASHBOARD TAB -->
+    <div id="dashboard" class="section active">
+        <div class="date-picker-bar">
+            <strong>Viewing Date:</strong>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="date" id="view-date-input" onchange="onDateChange()">
+                <button class="secondary" onclick="resetToToday()" style="padding: 6px 10px; font-size: 0.8rem;">Today</button>
+            </div>
+        </div>
+
+        <div class="sync-banner" id="sync-prompt">
+            <strong>Today's Pacing Sync:</strong> Loading...
+        </div>
+
+        <div class="card">
+            <h2>
+                <span id="my-routine-title">Your Daily Routine</span>
+                <span class="badge" id="my-day-badge">Rest</span>
+            </h2>
+            <div id="today-routine-content">
+                <!-- Dynamically populated checklist -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>
+                <span>Remi's Session</span>
+                <span class="badge" id="remi-day-badge">Weekend</span>
+            </h2>
+            <div class="workout-item">
+                <input type="checkbox" id="remi-check">
+                <div class="workout-details">
+                    <strong id="remi-today-title">Scheduled Session</strong>
+                    <span id="remi-today-desc">Check schedule tab for details</span>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: right;">
+            <button class="secondary" onclick="exportData()">Export Data (CSV)</button>
+        </div>
+    </div>
+
+    <!-- RIDER'S PLAN TAB -->
+    <div id="rider-plan" class="section">
+        <div class="card">
+            <h2>Rider's Interactive Fitness Blueprint</h2>
+            <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 12px;">Your structured 6-day garage strength rotation + daily 15-minute synced cardio block, designed for posture, lower leg stability, and core self-carriage.</p>
+            
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 1: Legs & Calves (Circuit A/B/C)</strong>
+                    <span>Focus: Barbell Squats, Sumo Squats, Split Squats, Calf Raises. Synced cardio: 12m Walk / 3m Mobility Push.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 2: Arms & Upper Body</strong>
+                    <span>Focus: Close-Grip Bench Press, Bicep Curls, Bench Dips, Overhead Tricep Extensions. Synced cardio: 12m Walk / 3m Run block.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 3: Core Stability</strong>
+                    <span>Focus: Weighted Vest Planks, Russian Twists, Hollow Body Holds, Deadbugs. Synced cardio: 12m Walk / 3m Core Push.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 4: Glutes & Hamstrings</strong>
+                    <span>Focus: Romanian Deadlifts (RDLs), Hip Thrusts, Reverse Lunges, Single-Leg Work. Synced cardio: 15-Minute Incline Hill Walk (Self-carriage sync).</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 5: Shoulders & Back</strong>
+                    <span>Focus: Standing Overhead Press, Incline Chest Press, DB Rows, Lateral Raises. Synced cardio: 12m Walk / 3m Posture Block.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 6: Functional Rider Fitness</strong>
+                    <span>Focus: Split Squats, Woodchops, Single-Leg Balance, High-Knee Marching. Synced cardio: 11m Walk / 4m Sustained Push.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Day 7: Rest & Active Recovery</strong>
+                    <span>Focus: 15-20 minute light walk or jog. Complete physical and mental reset.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STRENGTH TRACKER TAB -->
+    <div id="strength" class="section">
+        <div class="card">
+            <h2>Log Strength & Progressive Overload</h2>
+            <div class="tracker-grid">
+                <select id="exercise-select">
+                    <option value="Barbell Back Squats">Barbell Back Squats</option>
+                    <option value="Barbell Romanian Deadlifts">Barbell Romanian Deadlifts</option>
+                    <option value="Barbell Sumo Deadlifts">Barbell Sumo Deadlifts</option>
+                    <option value="Barbell Bench Press">Barbell Bench Press</option>
+                    <option value="Standing Barbell Overhead Press">Standing Barbell Overhead Press</option>
+                    <option value="Barbell Close-Grip Bench Press">Barbell Close-Grip Bench Press</option>
+                    <option value="DB Goblet Reverse Lunges">DB Goblet Reverse Lunges</option>
+                </select>
+                <input type="number" id="weight-input" placeholder="Weight (lbs)" step="5">
+                <button onclick="logWeight()">Save & Check Overload</button>
+            </div>
+            <p id="overload-suggestion" style="font-size: 0.85rem; color: var(--success); margin-top: 8px; font-weight: 600;"></p>
+        </div>
+
+        <div class="card">
+            <h2>Lift History</h2>
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Exercise</th><th>Weight (lbs)</th></tr>
+                </thead>
+                <tbody id="history-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- REMI'S PLAN TAB -->
+    <div id="remi" class="section">
+        <div class="card">
+            <h2>Remi's Interactive Conditioning Blueprint</h2>
+            <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 12px;">All sessions are designed to fit under 15 minutes of high-yield work, paired with your daily rider routine.</p>
+            
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Monday: Ground & Pole Work (Setup-Heavy)</strong>
+                    <span>Raised trot poles and serpentines for core engagement and agility (12-15 mins). Linked rider cardio: 12m Walk / 3m Mobility Push.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Tuesday: Round Pen Canter Intervals</strong>
+                    <span>Warm up walk/trot 5 mins. Canter 90 secs each lead (3 mins total) with walk breaks. Linked rider cardio: 12m Walk / 3m Jog.</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Thursday: Driveway Hill & Quick Transitions (Zero Setup)</strong>
+                    <span>4 repeats up paved driveway hill at brisk walk/trot. Linked rider cardio: 15-Minute Incline Hill Walk (Self-carriage sync).</span>
+                </div>
+            </div>
+            <div class="workout-item">
+                <div class="workout-details">
+                    <strong>Weekend (Sat or Sun): Mixed Interval / Trot Set</strong>
+                    <span>Brisk trot sets with short canter extensions. Linked rider cardio: 11m Walk / 4m Sustained Cardio Push.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TIMERS TAB -->
+    <div id="timers" class="section">
+        <div class="card" style="text-align: center;">
+            <h2>Workout Interval Timer</h2>
+            <p style="color: var(--text-light); font-size: 0.9rem;">Use for your run blocks or Remi's interval timing.</p>
+            <div class="timer-display" id="timer-display">03:00</div>
+            <div class="timer-controls">
+                <button onclick="startTimer(180)">3 Min Run/Canter</button>
+                <button onclick="startTimer(90)" class="secondary">90 Sec Interval</button>
+                <button onclick="resetTimer()" style="background: #c53030;">Stop / Reset</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    function switchTab(tabId) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // Load Strength Data & History
+    let liftHistory = JSON.parse(localStorage.getItem('liftHistory')) || [
+        {date: '2026-10-01', exercise: 'Barbell Back Squats', weight: 95},
+        {date: '2026-10-04', exercise: 'Barbell Romanian Deadlifts', weight: 105}
+    ];
+
+    function renderHistory() {
+        const tbody = document.getElementById('history-table-body');
+        tbody.innerHTML = '';
+        liftHistory.forEach(item => {
+            tbody.innerHTML += `<tr><td>${item.date}</td><td>${item.exercise}</td><td>${item.weight} lbs</td></tr>`;
+        });
+    }
+
+    function logWeight() {
+        const exercise = document.getElementById('exercise-select').value;
+        const weight = parseFloat(document.getElementById('weight-input').value);
+        if(!weight) return alert('Please enter a valid weight.');
+        
+        const today = new Date().toISOString().split('T')[0];
+        liftHistory.unshift({date: today, exercise, weight});
+        localStorage.setItem('liftHistory', JSON.stringify(liftHistory));
+        renderHistory();
+
+        const previousLifts = liftHistory.filter(h => h.exercise === exercise);
+        if(previousLifts.length > 1 && weight >= previousLifts[1].weight) {
+            document.getElementById('overload-suggestion').innerText = `Great job progressing! Next target for ${exercise}: consider bumping to ${weight + 5} lbs when comfortable.`;
+        } else {
+            document.getElementById('overload-suggestion').innerText = `Logged successfully! Keep consistent at ${weight} lbs before your next 5 lb jump.`;
+        }
+        document.getElementById('weight-input').value = '';
+    }
+
+    // Full 7-Day iCal Mapping with Alternative Swap Options
+    const strengthCycles = {
+        1: { 
+            title: "Day 1: Legs & Calves", 
+            exercises: [
+                {name: "Barbell Back Squats (6-8 reps, heavy)", alts: ["Weighted Vest Front Squats", "DB Goblet Squats", "Barbell Box Squats"]},
+                {name: "DB / Vest Sumo Squats (10-12 reps)", alts: ["DB Goblet Sumo Squats", "Bodyweight Pause Squats", "Vest Split Squats"]},
+                {name: "Vest Split Squats (8 reps/leg)", alts: ["DB Reverse Lunges", "DB Step-Ups on Bench", "Bulgarian Split Squats"]},
+                {name: "Vest Calf Raises on Bench Edge (15 reps)", alts: ["Standing Barbell Calf Raises", "Single-Leg DB Calf Raises", "Bodyweight Calf Raises"]},
+                {name: "Bodyweight Pause Squats (10 reps)", alts: ["Goblet Squat Isometric Hold", "Vest Frog Pumps", "Air Squats"]}
+            ] 
+        },
+        2: { 
+            title: "Day 2: Arms", 
+            exercises: [
+                {name: "Barbell Close-Grip Bench Press (8-10 reps)", alts: ["Weighted Vest Bench Dips", "DB Floor Chest Press", "Incline DB Skullcrushers"]},
+                {name: "DB Standing Bicep Curls (8-10 reps)", alts: ["DB Incline Hammer Curls", "DB Standing Zottman Curls", "DB Concentration Curls"]},
+                {name: "Weighted Vest Bench Dips (12 reps)", alts: ["Bench Floor Dips", "DB JM Press on Bench", "Overhead Tricep Extension"]},
+                {name: "DB Incline Hammer Curls (10 reps)", alts: ["DB Preacher Curls on Bench", "DB Standing Alternating Curls", "Resistance Band Curls"]},
+                {name: "DB Overhead Tricep Extension (12 reps)", alts: ["Incline DB Skullcrushers", "Close-Grip Push-ups", "Bench Dips"]}
+            ] 
+        },
+        3: { 
+            title: "Day 3: Core", 
+            exercises: [
+                {name: "Weighted Vest Plank Hold (45 secs)", alts: ["Weighted Vest Side Plank Hold", "Floor Hollow Body Hold", "Forearm Plank"]},
+                {name: "Med Ball Russian Twists (16 total reps)", alts: ["Med Ball Rotational Overhead Slams", "DB Standing Side Bends", "Lie Flat Leg Lowers"]},
+                {name: "DB Standing Side Bends (10 reps/side)", alts: ["DB Standing Woodchops", "DB Suitcase Isometric Hold", "Side Plank Dips"]},
+                {name: "Floor Hollow Body Hold (30-45 secs)", alts: ["Floor Flutter Kicks", "Lie Flat Leg Lowers", "Med Ball Hug Sit-ups"]},
+                {name: "Med Ball Floor Deadbugs (12 total reps)", alts: ["Bird-Dog Holds", "Deadbugs without Ball", "Hollow Body Rocks"]}
+            ] 
+        },
+        4: { 
+            title: "Day 4: Glutes & Hamstrings", 
+            exercises: [
+                {name: "Barbell Romanian Deadlifts (8-10 reps)", alts: ["Barbell Stiff-Leg Deadlifts", "DB Good Mornings", "DB Single-Leg RDLs"]},
+                {name: "Barbell or Vest Hip Thrusts (10-12 reps)", alts: ["Single-Leg Vest Hip Thrusts", "Barbell Hip Thrusts", "Vest Glute Bridges w/ Pause"]},
+                {name: "DB Goblet Reverse Lunges (8 reps/leg)", alts: ["DB Lateral Walking Lunges", "DB Step-Ups on Bench", "DB Curtsy Lunges"]},
+                {name: "DB Single-Leg RDLs (8 reps/leg)", alts: ["DB B-Stance RDLs", "Barbell RDLs", "Single-Leg Balance DB Hold"]},
+                {name: "Vest Frog Pumps (15-20 reps)", alts: ["Vest Glute Bridges", "Bodyweight Hip Thrusts", "Clamshells with Band"]}
+            ] 
+        },
+        5: { 
+            title: "Day 5: Shoulders & Back", 
+            exercises: [
+                {name: "Standing Barbell Overhead Press (8-10 reps)", alts: ["Standing Barbell Push Press", "Seated DB Arnold Press", "DB Flat Bench Press"]},
+                {name: "Incline DB Chest Press (8-10 reps)", alts: ["DB Floor Chest Press", "Barbell Floor Press", "DB Flat Bench Press"]},
+                {name: "Chest-Supported DB Rows (10-12 reps)", alts: ["Incline DB Row", "Barbell Underhand Rows", "DB Bent-Over Rear Delt Flyes"]},
+                {name: "DB Standing Lateral Raises (12 reps)", alts: ["DB Front Raises", "Prone DB Y-Raises on Bench", "Upright Rows"]},
+                {name: "Prone DB Y-Raises on Bench (12 reps)", alts: ["DB Bent-Over Rear Delt Flyes", "Band Pull-Aparts", "Prone Reverse Flyes"]}
+            ] 
+        },
+        6: { 
+            title: "Day 6: Functional Rider Fitness", 
+            exercises: [
+                {name: "Weighted Vest Goblet Split Squats (8 reps/leg)", alts: ["Vest Reverse Lunge to High Knee Lift", "Vest Step-Ups with Knee Drive", "DB Goblet Reverse Lunges"]},
+                {name: "Med Ball Woodchops (10 reps/side)", alts: ["Med Ball Rotational Floor Taps", "DB Standing Woodchops", "Med Ball Standing Diagonal Chops"]},
+                {name: "DB Standing Single-Leg Hip Hikes (12 reps/leg)", alts: ["Single-Leg Balance DB Hold", "DB Single-Leg RDL Balance", "Step-Ups"]},
+                {name: "Weighted Vest High-Knee Marching (45 secs)", alts: ["Vest Step-Ups with Knee Drive", "High-Knee Jog in Place", "Vest Marching"]},
+                {name: "Deep Sumo Squat Hold (45 secs)", alts: ["DB Sumo Squat Isometric Hold", "Wall Sit", "Plank Hold"]}
+            ] 
+        },
+        0: { title: "Rest & Active Recovery", exercises: [{name: "15-20 Min light walk or jog", alts: ["Gentle stretching", "Light foam rolling"]}] }
+    };
+
+    // Initialize Date Picker to Today on Load
+    window.onload = function() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('view-date-input').value = todayStr;
+        loadWorkoutForDate(todayStr);
+        renderHistory();
+    };
+
+    function resetToToday() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('view-date-input').value = todayStr;
+        loadWorkoutForDate(todayStr);
+    }
+
+    function onDateChange() {
+        const selectedDate = document.getElementById('view-date-input').value;
+        if(selectedDate) {
+            loadWorkoutForDate(selectedDate);
+        }
+    }
+
+    function loadWorkoutForDate(dateString) {
+        const dateObj = new Date(dateString + 'T00:00:00'); 
+        const dayOfWeek = dateObj.getDay(); 
+        const currentWorkout = strengthCycles[dayOfWeek];
+        
+        document.getElementById('my-day-badge').innerText = dayOfWeek === 0 ? "Rest" : `Day ${dayOfWeek}`;
+        document.getElementById('my-routine-title').innerText = dayOfWeek === 0 ? "Your Rest & Active Recovery Day" : `Your Daily Routine (${currentWorkout.title})`;
+        
+        const container = document.getElementById('today-routine-content');
+        container.innerHTML = '';
+
+        if (dayOfWeek === 0) {
+            container.innerHTML = `
+                <div class="workout-item">
+                    <input type="checkbox" id="cardio-check">
+                    <div class="workout-details">
+                        <strong>15-20 Min Light Walk or Jog</strong>
+                        <span>Active recovery day</span>
+                    </div>
+                </div>`;
+        } else {
+            let cardioDesc = "12-minute walk, 3-minute jog block (Synced to Remi's workload)";
+            if(dayOfWeek === 1) cardioDesc = "12-minute walk, 3-minute mobility & active core push";
+            else if(dayOfWeek === 2) cardioDesc = "12-minute walk, 3-minute continuous run block (Synced to Remi's 3m canter)";
+            else if(dayOfWeek === 4) cardioDesc = "15-Minute Treadmill Incline Hill Walk (Synced to Remi's driveway hill self-carriage work)";
+            else if(dayOfWeek === 6) cardioDesc = "11-minute walk, 4-minute sustained cardio push (Synced to Remi's interval set)";
+
+            container.innerHTML = `
+                <div class="workout-item">
+                    <input type="checkbox" id="cardio-check">
+                    <div class="workout-details">
+                        <strong>15-Minute Treadmill Cardio Block</strong>
+                        <span>${cardioDesc}</span>
+                    </div>
+                </div>`;
+            
+            currentWorkout.exercises.forEach((exObj, idx) => {
+                container.innerHTML += `
+                    <div class="workout-item" id="ex-row-${idx}">
+                        <input type="checkbox" id="str-${idx}">
+                        <div class="workout-details">
+                            <strong id="ex-name-${idx}">${exObj.name}</strong>
+                            <span id="ex-sub-${idx}">3-4 Rounds Circuit</span>
+                        </div>
+                        <button class="swap-btn" onclick="swapExercise(${idx}, '${btoa(JSON.stringify(exObj.alts))}')">Swap</button>
+                    </div>`;
+            });
+        }
+
+        let remiTitle = "Rest / Active Recovery Day";
+        let remiDesc = "Light turnout or grooming.";
+        let syncBannerText = "Enjoy your active recovery rest day! Keep movement gentle and restorative.";
+
+        if(dayOfWeek === 1) { 
+            remiTitle = "Monday: Ground & Pole Work"; 
+            remiDesc = "Raised trot poles and serpentines (Setup-heavy). Linked rider cardio: 12m walk / 3m mobility push."; 
+            syncBannerText = "<strong>Pacing Sync:</strong> Remi is doing ground & pole work. Your cardio block pairs a 12-min walk with a 3-min mobility push!";
+        }
+        else if(dayOfWeek === 2) { 
+            remiTitle = "Tuesday: Round Pen Canter Intervals"; 
+            remiDesc = "Canter 90 secs each lead (3 mins total). Linked rider cardio: 12m walk / 3m run block."; 
+            syncBannerText = "<strong>Pacing Sync:</strong> Remi is working a 3-minute total canter. Your cardio block pairs a 12-min walk with a matching 3-min run!";
+        }
+        else if(dayOfWeek === 4) { 
+            remiTitle = "Thursday: Driveway Hill Work"; 
+            remiDesc = "Quick driveway hill repeats (Zero setup). Linked rider cardio: 15-minute treadmill incline hill walk."; 
+            syncBannerText = "<strong>Pacing Sync:</strong> Remi is tackling the driveway hill for self-carriage. Your cardio block matches with a 15-minute incline hill walk!";
+        }
+        else if(dayOfWeek === 6) { 
+            remiTitle = "Weekend: Mixed Interval Set"; 
+            remiDesc = "Brisk trot sets with short canter extensions. Linked rider cardio: 11m walk / 4m cardio push.";
+            syncBannerText = "<strong>Pacing Sync:</strong> Remi has a mixed interval set. Your cardio block pairs an 11-min walk with a 4-min sustained cardio push!";
+        }
+
+        document.getElementById('remi-today-title').innerText = remiTitle;
+        document.getElementById('remi-today-desc').innerText = remiDesc;
+        document.getElementById('sync-prompt').innerHTML = syncBannerText;
+    }
+
+    // Exercise Swap Logic
+    function swapExercise(idx, encodedAlts) {
+        const alts = JSON.parse(atob(encodedAlts));
+        if(!alts || alts.length === 0) return alert('No alternative exercises available for this movement.');
+        
+        const nameEl = document.getElementById(`ex-name-${idx}`);
+        const currentName = nameEl.innerText;
+        
+        let choice = prompt(`Choose a substitute exercise by typing the number:\n` + alts.map((a, i) => `${i+1}. ${a}`).join('\n'));
+        let choiceIdx = parseInt(choice) - 1;
+        
+        if(isNaN(choiceIdx) || choiceIdx < 0 || choiceIdx >= alts.length) {
+            return; 
+        }
+        
+        const newEx = alts[choiceIdx];
+        alts[choiceIdx] = currentName;
+        
+        nameEl.innerText = newEx;
+        const btn = document.querySelector(`#ex-row-${idx} .swap-btn`);
+        btn.setAttribute('onclick', `swapExercise(${idx}, '${btoa(JSON.stringify(alts))}')`);
+    }
+
+    // Timer Logic
+    let timerInterval = null;
+    function startTimer(seconds) {
+        clearInterval(timerInterval);
+        let timeLeft = seconds;
+        const display = document.getElementById('timer-display');
+        
+        timerInterval = setInterval(() => {
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            display.innerText = `${m < 10 ? '0':''}${m}:${s < 10 ? '0':''}${s}`;
+            
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert('Interval complete! Great job.');
+            }
+            timeLeft--;
+        }, 1000);
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        document.getElementById('timer-display').innerText = "03:00";
+    }
+
+    // Export Data CSV
+    function exportData() {
+        let csv = "Date,Exercise,Weight\n";
+        liftHistory.forEach(h => {
+            csv += `${h.date},"${h.exercise}",${h.weight}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'equifit_strength_history.csv');
+        a.click();
+    }
+</script>
+</body>
+</html>
